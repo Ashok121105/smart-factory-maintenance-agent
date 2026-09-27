@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;650;700&display=swap');
+
+:root {
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  color: #e4ece8;
+  background: #0d1415;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  --font-sans: 'Manrope', 'Segoe UI', sans-serif;
+  --font-mono: 'DM Mono', Consolas, monospace;
+  --surface-base: #0b1117;
+  --surface-panel: #111a22;
+  --line: #293744;
+  --text-primary: #e4ece8;
+  --text-secondary: #98a8a2;
+  --text-dim: #788984;
+  --accent: #49c8f2;
+  --mint: var(--accent);
+  --amber: #e7b466;
+  --red: #ee8277;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; min-height: 100%; background: var(--surface-base); }
+body { min-width: 320px; min-height: 100vh; margin: 0; background-color: var(--surface-base); background-image: linear-gradient(rgba(85, 153, 180, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(85, 153, 180, 0.025) 1px, transparent 1px); background-size: 32px 32px; }
+button, input, textarea { font: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+::selection { background: rgba(107, 214, 180, 0.25); color: #f4fff9; }
+#root { min-height: 100vh; }
