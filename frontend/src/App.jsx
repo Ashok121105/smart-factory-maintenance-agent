@@ -331,7 +331,7 @@ function MemoryFlow() {
       <div className="flow-heading"><span className="eyebrow">OBSERVE → RECALL → REASON → ACT → LEARN</span><span className="flow-heading__note">Verified outcomes inform future investigations</span></div>
       <ol className="flow-steps">
         {steps.map((step, index) => (
-          <li className={`flow-step${index === 1 ? ' flow-step--memory' : ''}`} key={step.label}>
+          <li className="flow-step" key={step.label}>
             <span className="flow-step__number">0{index + 1}</span><strong>{step.label}</strong><span className="flow-step__detail">{step.detail}</span>
           </li>
         ))}
