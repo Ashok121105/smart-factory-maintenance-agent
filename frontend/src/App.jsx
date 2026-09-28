@@ -196,33 +196,89 @@ function MemoryCard({ memory, index }) {
   )
 }
 
+function getMemoryEvidence(memories) {
+  const evidenceTypes = [
+    {
+      label: 'Previous root cause',
+      matches: (text) => /(?:confirmed|identified|determined).{0,60}root cause|root cause.{0,60}(?:confirmed|identified|determined|was|is)/i.test(text),
+      missing: 'No returned memory explicitly states a confirmed root cause.',
+    },
+    {
+      label: 'Previous action',
+      matches: (text) => /\b(replaced|repaired|adjusted|cleaned|lubricated|aligned|maintenance action|repair performed)\b/i.test(text),
+      missing: 'No returned memory explicitly records a maintenance action.',
+    },
+    {
+      label: 'Previous result',
+      matches: (text) => /\b(returned to normal|restored normal|resolved|resolution|returned.*normal operation)\b/i.test(text),
+      missing: 'No returned memory explicitly records a resolution result.',
+    },
+  ]
+
+  return evidenceTypes.map((evidence) => {
+    const record = memories.find((memory) => evidence.matches(memory.text || memory.fact || ''))
+    return { label: evidence.label, text: record?.text || record?.fact || evidence.missing }
+  })
+}
+
 function MemoryPanel({ memories, status, attempted }) {
   const memoryBadge = status === 'loading'
     ? 'QUERYING HINDSIGHT'
     : status === 'unavailable'
       ? 'HINDSIGHT UNAVAILABLE'
       : memories.length > 0
-        ? 'RECALLED FROM HINDSIGHT'
+        ? `${memories.length} HINDSIGHT RESULTS`
         : attempted
           ? 'NO RELEVANT MEMORY'
           : 'PERSISTENT EXPERIENCE'
 
   return (
     <section className="panel memory-panel" aria-labelledby="memory-heading">
-      <PanelHeading headingId="memory-heading" eyebrow={<><span className="memory-glyph" aria-hidden="true">✳</span> PERSISTENT EXPERIENCE</>} title="Memory recall" description="Previous maintenance experience retrieved from Hindsight" trailing={<span className="source-badge"><span className="source-badge__dot" />{memoryBadge}</span>} />
+      <PanelHeading headingId="memory-heading" eyebrow={<><span className="memory-glyph" aria-hidden="true">✳</span> PERSISTENT EXPERIENCE</>} title="Hindsight memory" description="Actual maintenance records returned for this investigation" trailing={<span className="source-badge"><span className="source-badge__dot" />{memoryBadge}</span>} />
       {status === 'loading' ? (
         <div className="memory-loading" role="status"><span className="spinner spinner--small" />Recalling maintenance experience…</div>
       ) : memories.length > 0 ? (
-        <div className="memory-list" aria-live="polite">
-          {memories.map((memory, index) => <MemoryCard key={memory.id || `${index}-${memory.text}`} memory={memory} index={index} />)}
+        <div aria-live="polite">
+          <div className="memory-result-count"><strong>{memories.length} relevant {memories.length === 1 ? 'memory' : 'memories'} returned</strong><span>Evidence below is taken from the Hindsight response.</span></div>
+          <div className="memory-evidence-list">
+            {getMemoryEvidence(memories).map((evidence) => <div className="memory-evidence" key={evidence.label}><strong>{evidence.label}</strong><p>{evidence.text}</p></div>)}
+          </div>
+          <h3 className="memory-records-heading">Previous maintenance experience</h3>
+          <div className="memory-list">
+            {memories.map((memory, index) => <MemoryCard key={memory.id || `${index}-${memory.text}`} memory={memory} index={index} />)}
+          </div>
         </div>
       ) : status === 'unavailable' ? (
         <div className="memory-state memory-state--error" role="status"><span className="state-marker" aria-hidden="true">!</span><div><strong>Historical memory unavailable</strong><p>Hindsight could not return maintenance context for this investigation.</p></div></div>
       ) : attempted ? (
-        <div className="memory-state"><span className="state-marker state-marker--quiet" aria-hidden="true">—</span><div><strong>No relevant historical maintenance memory was found.</strong><p>Hindsight was queried for this machine and fault.</p></div></div>
+        <div className="memory-state"><span className="state-marker state-marker--quiet" aria-hidden="true">0</span><div><strong>No relevant previous experience found.</strong><p>Hindsight returned 0 relevant memories for this investigation.</p></div></div>
       ) : (
         <div className="memory-empty"><div className="memory-empty__symbol" aria-hidden="true">H</div><p>Investigate a machine fault to retrieve relevant maintenance experience.</p><span>Previous repairs and technician observations will appear here.</span></div>
       )}
+    </section>
+  )
+}
+
+function CurrentCondition({ incident }) {
+  if (!incident) return null
+
+  const readings = [
+    { label: 'Temperature', value: incident.temperatureC, unit: '°C' },
+    { label: 'Vibration', value: incident.vibrationMmS, unit: 'mm/s' },
+    { label: 'Current', value: incident.currentA, unit: 'A' },
+    { label: 'Voltage', value: incident.voltageV, unit: 'V' },
+  ]
+
+  return (
+    <section className="condition-summary" aria-labelledby="condition-summary-heading">
+      <div className="condition-summary__heading">
+        <div><p className="eyebrow">OBSERVE</p><h2 id="condition-summary-heading">Current machine condition</h2></div>
+        <span className="condition-summary__source">SIMULATED / MANUAL MACHINE READINGS</span>
+      </div>
+      <div className="condition-summary__identity"><span><small>MACHINE ID</small><strong>{incident.machineId}</strong></span><span><small>FAULT / CONDITION</small><strong>{incident.fault}</strong></span></div>
+      <dl className="condition-readings">
+        {readings.map((reading) => <div className="condition-reading" key={reading.label}><dt>{reading.label}</dt><dd>{reading.value !== undefined ? `${reading.value} ${reading.unit}` : 'Not provided'}</dd></div>)}
+      </dl>
     </section>
   )
 }
@@ -262,15 +318,21 @@ function InvestigationResult({ investigation, incident, llmStatus, hindsightStat
 }
 
 function MemoryFlow() {
-  const steps = ['Observe condition', 'Recall Hindsight', 'Reason with Groq', 'Technician acts', 'Learn outcome']
+  const steps = [
+    { label: 'OBSERVE', detail: 'Machine condition' },
+    { label: 'RECALL', detail: 'Hindsight memory' },
+    { label: 'REASON', detail: 'Groq guidance' },
+    { label: 'ACT', detail: 'Technician investigation' },
+    { label: 'LEARN', detail: 'Recorded outcome' },
+  ]
 
   return (
     <section className="panel flow-panel" aria-label="Investigation flow">
-      <div className="flow-heading"><span className="eyebrow">CONTEXT TO GUIDANCE</span><span className="flow-heading__note">Memory grounds each investigation</span></div>
+      <div className="flow-heading"><span className="eyebrow">OBSERVE → RECALL → REASON → ACT → LEARN</span><span className="flow-heading__note">Verified outcomes inform future investigations</span></div>
       <ol className="flow-steps">
         {steps.map((step, index) => (
-          <li className={`flow-step${index === 1 ? ' flow-step--memory' : ''}`} key={step}>
-            <span className="flow-step__number">0{index + 1}</span><strong>{step}</strong>
+          <li className={`flow-step${index === 1 ? ' flow-step--memory' : ''}`} key={step.label}>
+            <span className="flow-step__number">0{index + 1}</span><strong>{step.label}</strong><span className="flow-step__detail">{step.detail}</span>
           </li>
         ))}
       </ol>
@@ -303,7 +365,7 @@ function MemoryComparison({ incident, memories }) {
         <article className="comparison-side comparison-side--without">
           <span className="comparison-label">WITHOUT RELEVANT MEMORY</span>
           <p>{condition}</p>
-          <strong>{memories.length ? 'Generic baseline · counterfactual' : 'General investigation guidance'}</strong>
+          <strong>{memories.length ? 'Illustrative Counterfactual Baseline' : 'General investigation guidance'}</strong>
           <span>{memories.length ? 'Illustrative current-condition-only baseline; this was not a second AI run.' : 'No relevant previous maintenance experience was returned for this response.'}</span>
         </article>
         <article className="comparison-side comparison-side--with">
@@ -328,7 +390,7 @@ function InvestigationOutcome({ incident, form, onChange, onSubmit, saving, save
         <label className="field"><span>Result / resolution <span className="required-mark">*</span></span><input name="repairOutcome" value={form.repairOutcome} onChange={onChange} maxLength={1000} required placeholder="e.g. Vibration returned to normal" /></label>
         <label className="field field--full"><span>Technician notes</span><textarea name="outcomeNotes" value={form.outcomeNotes} onChange={onChange} maxLength={1000} rows={2} placeholder="Inspection evidence, readings after repair, or unresolved concerns" /></label>
         {error && <div className="outcome-error" role="alert">{error}</div>}
-        {saved && <div className="outcome-success" role="status"><strong>Experience learned</strong><span>Saved to Hindsight Memory. This maintenance outcome can be recalled during future investigations.</span></div>}
+        {saved && <div className="outcome-success" role="status"><strong>Experience Learned</strong><span>Saved to Hindsight Memory. This maintenance outcome can be recalled during future investigations.</span></div>}
         <button className="primary-button" type="submit" disabled={saving || saved}>{saving ? <><span className="spinner" aria-hidden="true" />Saving to Hindsight…</> : saved ? 'Experience saved to Hindsight' : 'Save experience to Hindsight'}</button>
       </form>
       <p className="outcome-context">Incident: {incident.machineId} · {incident.fault}. Saving is a synchronous Hindsight write; confirmation appears only after it succeeds.</p>
@@ -544,6 +606,8 @@ function App() {
           </div>
 
           <SystemStatus hindsightStatus={hindsightStatus} llmStatus={llmStatus} agentStatus={agentStatus} />
+
+          <CurrentCondition incident={investigatedIncident} />
 
           {errorMessage && !loading && llmStatus !== 'unavailable' && <div className="notice notice--error" role="alert"><span className="notice__symbol" aria-hidden="true">!</span><span>{errorMessage}</span></div>}
 
