@@ -8,12 +8,16 @@ const router = express.Router();
 const incidentTextFields = [
   "incidentDate",
   "symptoms",
+  "observedCondition",
+  "possibleCause",
+  "confirmedRootCause",
   "repairPerformed",
   "partReplaced",
   "technicianAction",
   "repairOutcome",
   "technicianObservation",
 ];
+const incidentReadingFields = ["temperatureC", "vibrationMmS", "currentA", "voltageV"];
 
 function validateIncident(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -24,6 +28,11 @@ function validateIncident(body) {
   }
   if (typeof body.fault !== "string" || !body.fault.trim()) {
     return { error: "fault is required" };
+  }
+  for (const field of ["repairPerformed", "repairOutcome"]) {
+    if (typeof body[field] !== "string" || !body[field].trim()) {
+      return { error: `${field} is required to save a maintenance outcome` };
+    }
   }
 
   const incident = {
@@ -41,6 +50,13 @@ function validateIncident(body) {
     if (typeof body[field] === "string" && body[field].trim()) {
       incident[field] = body[field].trim();
     }
+  }
+
+  for (const field of incidentReadingFields) {
+    if (body[field] !== undefined && (typeof body[field] !== "number" || !Number.isFinite(body[field]))) {
+      return { error: `${field} must be a finite number` };
+    }
+    if (body[field] !== undefined) incident[field] = body[field];
   }
 
   if (incident.incidentDate && Number.isNaN(Date.parse(incident.incidentDate))) {

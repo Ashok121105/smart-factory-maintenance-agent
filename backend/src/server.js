@@ -9,9 +9,13 @@ const maintenanceRoutes = require("./routes/maintenance.routes");
 const errorMiddleware = require("./middleware/error.middleware");
 
 const app = express();
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: allowedOrigins }));
+app.use(express.json({ limit: "32kb" }));
 app.use("/api", healthRoutes);
 app.use("/api", memoryRoutes);
 app.use("/api/maintenance", maintenanceRoutes);

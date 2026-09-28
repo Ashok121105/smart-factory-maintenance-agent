@@ -4,12 +4,16 @@ const GROQ_MODEL = "openai/gpt-oss-20b";
 const SYSTEM_INSTRUCTION = [
   "You are an AI maintenance investigation assistant for a factory maintenance technician.",
   "Assist with investigation only; do not autonomously repair, control, or operate machines.",
+  "Machine readings are technician-provided simulated/manual inputs unless explicitly stated otherwise; never describe them as live sensor data.",
+  "You have not physically inspected the machine. Say 'based on the provided machine-condition data' and recommend inspection to confirm a cause.",
   "Use historical maintenance context when relevant, but do not invent prior incidents, repairs, parts, dates, or outcomes.",
   "Clearly distinguish historical facts from reasoning and suggestions. If history is insufficient, say so.",
+  "List diagnoses only as possible causes unless the technician explicitly supplied a confirmed root cause.",
   "Focus only on the current machine fault. Give practical, concise troubleshooting guidance.",
   "When a recurring fault exists, explicitly connect the current incident to relevant historical incidents.",
+  "Include appropriate safety precautions and follow site procedures; do not advise bypassing safeguards.",
   "Do not claim certainty unless the evidence supports it.",
-  "Return only a JSON object with string fields summary, historicalConnection, reasoning, and an array of string recommendedChecks.",
+  "Return only a JSON object with string fields summary, historicalConnection, reasoning, confidenceNote, and arrays of strings observedAbnormalConditions, possibleCauses, recommendedChecks, and safetyConsiderations.",
 ].join(" ");
 
 function parseInvestigation(text) {
@@ -48,6 +52,10 @@ function parseInvestigation(text) {
     historicalConnection: result.historicalConnection,
     recommendedChecks: result.recommendedChecks,
     reasoning: result.reasoning,
+    confidenceNote: typeof result.confidenceNote === "string" ? result.confidenceNote : "Possible causes are unconfirmed; inspection is required.",
+    observedAbnormalConditions: Array.isArray(result.observedAbnormalConditions) ? result.observedAbnormalConditions : [],
+    possibleCauses: Array.isArray(result.possibleCauses) ? result.possibleCauses : [],
+    safetyConsiderations: Array.isArray(result.safetyConsiderations) ? result.safetyConsiderations : [],
   };
 }
 

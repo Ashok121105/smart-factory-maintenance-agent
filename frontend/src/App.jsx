@@ -135,6 +135,23 @@ function InvestigationForm({ form, onChange, onSubmit, loading, loadingMessage }
           <span>Symptoms <span className="required-mark">*</span></span>
           <textarea name="symptoms" value={form.symptoms} onChange={onChange} placeholder="What is the machine doing?" rows={3} maxLength={1000} required />
         </label>
+        <div className="field-group-label field--full"><strong>Current machine condition</strong><span>SIMULATED / MANUAL INPUTS</span></div>
+        <label className="field">
+          <span>Temperature (°C)</span>
+          <input name="temperatureC" type="number" step="any" value={form.temperatureC} onChange={onChange} placeholder="e.g. 86" />
+        </label>
+        <label className="field">
+          <span>Vibration (mm/s)</span>
+          <input name="vibrationMmS" type="number" step="any" value={form.vibrationMmS} onChange={onChange} placeholder="e.g. 7.1" />
+        </label>
+        <label className="field">
+          <span>Current (A)</span>
+          <input name="currentA" type="number" step="any" value={form.currentA} onChange={onChange} placeholder="e.g. 12.0" />
+        </label>
+        <label className="field">
+          <span>Voltage (V)</span>
+          <input name="voltageV" type="number" step="any" value={form.voltageV} onChange={onChange} placeholder="Optional" />
+        </label>
         <label className="field">
           <span>Incident date</span>
           <input name="incidentDate" type="date" value={form.incidentDate} onChange={onChange} />
@@ -180,9 +197,19 @@ function MemoryCard({ memory, index }) {
 }
 
 function MemoryPanel({ memories, status, attempted }) {
+  const memoryBadge = status === 'loading'
+    ? 'QUERYING HINDSIGHT'
+    : status === 'unavailable'
+      ? 'HINDSIGHT UNAVAILABLE'
+      : memories.length > 0
+        ? 'RECALLED FROM HINDSIGHT'
+        : attempted
+          ? 'NO RELEVANT MEMORY'
+          : 'PERSISTENT EXPERIENCE'
+
   return (
     <section className="panel memory-panel" aria-labelledby="memory-heading">
-      <PanelHeading headingId="memory-heading" eyebrow={<><span className="memory-glyph" aria-hidden="true">✳</span> PERSISTENT EXPERIENCE</>} title="Memory recall" description="Previous maintenance experience retrieved from Hindsight" trailing={<span className="source-badge"><span className="source-badge__dot" />RECALLED FROM HINDSIGHT</span>} />
+      <PanelHeading headingId="memory-heading" eyebrow={<><span className="memory-glyph" aria-hidden="true">✳</span> PERSISTENT EXPERIENCE</>} title="Memory recall" description="Previous maintenance experience retrieved from Hindsight" trailing={<span className="source-badge"><span className="source-badge__dot" />{memoryBadge}</span>} />
       {status === 'loading' ? (
         <div className="memory-loading" role="status"><span className="spinner spinner--small" />Recalling maintenance experience…</div>
       ) : memories.length > 0 ? (
@@ -212,11 +239,20 @@ function InvestigationResult({ investigation, incident, llmStatus, hindsightStat
           <div className="historical-connection"><div className="historical-connection__label"><span aria-hidden="true">↳</span> HISTORICAL CONNECTION</div><p>{investigation.historicalConnection}</p></div>
           <div className="assessment-columns">
             <div className="assessment-block">
+              <h3>Observed conditions</h3>
+              {investigation.observedAbnormalConditions?.length ? <ul className="detail-list">{investigation.observedAbnormalConditions.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul> : <p className="muted-copy">Based on the machine-condition data provided.</p>}
+              <h3 className="detail-list-heading">Possible causes · inspection required</h3>
+              {investigation.possibleCauses?.length ? <ul className="detail-list">{investigation.possibleCauses.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul> : <p className="muted-copy">No possible causes were returned.</p>}
+            </div>
+            <div className="assessment-block">
               <h3>Recommended checks</h3>
               {Array.isArray(investigation.recommendedChecks) && investigation.recommendedChecks.length > 0 ? <ol className="checks-list">{investigation.recommendedChecks.map((check, index) => <li key={`${index}-${check}`}><span>{String(index + 1).padStart(2, '0')}</span>{check}</li>)}</ol> : <p className="muted-copy">Groq returned no recommended checks.</p>}
+              <h3 className="detail-list-heading">Safety considerations</h3>
+              {investigation.safetyConsiderations?.length ? <ul className="detail-list">{investigation.safetyConsiderations.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul> : <p className="muted-copy">Follow site procedures and equipment-specific safety controls.</p>}
             </div>
-            <div className="assessment-block assessment-block--reasoning"><h3>Reasoning</h3><p>{investigation.reasoning}</p></div>
           </div>
+          <div className="assessment-block assessment-block--reasoning"><h3>AI reasoning</h3><p>{investigation.reasoning}</p></div>
+          <div className="confidence-note"><strong>Confidence &amp; uncertainty</strong><span>{investigation.confidenceNote}</span></div>
         </div>
       ) : (
         <div className="llm-error" role="alert"><span className="state-marker" aria-hidden="true">!</span><div><strong>AI reasoning is temporarily unavailable.</strong><p>{message}</p><p>{hindsightStatus === 'connected' ? 'Hindsight memory is still connected. Historical facts above were retrieved separately; no AI response is being shown.' : 'Hindsight memory could not be confirmed for this investigation. No AI response is being shown.'}</p></div></div>
@@ -226,7 +262,7 @@ function InvestigationResult({ investigation, incident, llmStatus, hindsightStat
 }
 
 function MemoryFlow() {
-  const steps = ['Current fault', 'Hindsight memory', 'Past maintenance experience', 'AI reasoning', 'Investigation guidance']
+  const steps = ['Observe condition', 'Recall Hindsight', 'Reason with Groq', 'Technician acts', 'Learn outcome']
 
   return (
     <section className="panel flow-panel" aria-label="Investigation flow">
@@ -245,15 +281,57 @@ function MemoryFlow() {
 function LearningExplanation() {
   return (
     <section className="panel learning-panel" aria-labelledby="learning-heading">
-      <PanelHeading headingId="learning-heading" eyebrow="MEMORY LOOP" title="How the agent learns" />
-      <div className="learning-steps">
-        <div className="learning-step"><span className="learning-step__number">INTERACTION 1</span><strong>Generic maintenance context</strong><p>Guidance starts with the current fault and available context.</p></div>
-        <span className="learning-arrow" aria-hidden="true">→</span>
-        <div className="learning-step learning-step--memory"><span className="learning-step__number">INTERACTION 5</span><strong>Recurring problems recognized</strong><p>Relevant recorded incidents can reveal recurring machine faults.</p></div>
-        <span className="learning-arrow" aria-hidden="true">→</span>
-        <div className="learning-step"><span className="learning-step__number">INTERACTION 20</span><strong>More contextual investigation</strong><p>Accumulated experience can inform later troubleshooting.</p></div>
+      <PanelHeading headingId="learning-heading" eyebrow="OBSERVE → RECALL → REASON → ACT → LEARN" title="A maintenance agent that remembers" />
+      <p className="learning-note learning-note--standalone">Each new investigation checks persistent Hindsight experience before Groq reasons over the current condition. Only technician-recorded outcomes are written back, so future fault investigations can use verified repair history.</p>
+    </section>
+  )
+}
+
+function MemoryComparison({ incident, memories }) {
+  const condition = [
+    incident.displaySymptoms,
+    incident.temperatureC !== undefined && `Temperature ${incident.temperatureC} °C`,
+    incident.vibrationMmS !== undefined && `Vibration ${incident.vibrationMmS} mm/s`,
+    incident.currentA !== undefined && `Current ${incident.currentA} A`,
+    incident.voltageV !== undefined && `Voltage ${incident.voltageV} V`,
+  ].filter(Boolean).join(' · ')
+
+  return (
+    <section className="panel comparison-panel" aria-label="Memory impact comparison">
+      <div className="comparison-heading"><p className="eyebrow">BEFORE / AFTER MEMORY DEMO</p><h2>Same machine condition, different context</h2></div>
+      <div className="comparison-grid">
+        <article className="comparison-side comparison-side--without">
+          <span className="comparison-label">WITHOUT RELEVANT MEMORY</span>
+          <p>{condition}</p>
+          <strong>{memories.length ? 'Generic baseline · counterfactual' : 'General investigation guidance'}</strong>
+          <span>{memories.length ? 'Illustrative current-condition-only baseline; this was not a second AI run.' : 'No relevant previous maintenance experience was returned for this response.'}</span>
+        </article>
+        <article className="comparison-side comparison-side--with">
+          <span className="comparison-label">WITH HINDSIGHT MEMORY</span>
+          <p>{condition}</p>
+          <strong>{memories.length ? `${memories.length} historical experience${memories.length === 1 ? '' : 's'} recalled` : 'No relevant experience recalled'}</strong>
+          <span>{memories.length ? 'Groq received current condition data plus the recalled Hindsight context.' : 'The AI had current condition data only; no past experience is implied.'}</span>
+        </article>
       </div>
-      <p className="learning-note">Recorded incidents and repair outcomes can become future Hindsight memory. Technicians remain responsible for diagnosis and machine operation.</p>
+    </section>
+  )
+}
+
+function InvestigationOutcome({ incident, form, onChange, onSubmit, saving, saved, error }) {
+  return (
+    <section className="panel outcome-panel" aria-labelledby="outcome-heading">
+      <PanelHeading headingId="outcome-heading" eyebrow="TECHNICIAN-RECORDED · OPTIONAL UNTIL RESOLVED" title="Investigation outcome" description="Record what inspection confirmed and what resolved the fault. Possible causes are not treated as confirmed." />
+      <form className="outcome-form" onSubmit={onSubmit}>
+        <label className="field"><span>Possible cause</span><input name="possibleCause" value={form.possibleCause} onChange={onChange} maxLength={500} placeholder="Unconfirmed suspicion, if any" /></label>
+        <label className="field"><span>Confirmed root cause</span><input name="confirmedRootCause" value={form.confirmedRootCause} onChange={onChange} maxLength={500} placeholder="Only if technician-confirmed" /></label>
+        <label className="field"><span>Maintenance action taken <span className="required-mark">*</span></span><input name="repairPerformed" value={form.repairPerformed} onChange={onChange} maxLength={1000} required placeholder="e.g. Replaced bearing" /></label>
+        <label className="field"><span>Result / resolution <span className="required-mark">*</span></span><input name="repairOutcome" value={form.repairOutcome} onChange={onChange} maxLength={1000} required placeholder="e.g. Vibration returned to normal" /></label>
+        <label className="field field--full"><span>Technician notes</span><textarea name="outcomeNotes" value={form.outcomeNotes} onChange={onChange} maxLength={1000} rows={2} placeholder="Inspection evidence, readings after repair, or unresolved concerns" /></label>
+        {error && <div className="outcome-error" role="alert">{error}</div>}
+        {saved && <div className="outcome-success" role="status"><strong>Experience learned</strong><span>Saved to Hindsight Memory. This maintenance outcome can be recalled during future investigations.</span></div>}
+        <button className="primary-button" type="submit" disabled={saving || saved}>{saving ? <><span className="spinner" aria-hidden="true" />Saving to Hindsight…</> : saved ? 'Experience saved to Hindsight' : 'Save experience to Hindsight'}</button>
+      </form>
+      <p className="outcome-context">Incident: {incident.machineId} · {incident.fault}. Saving is a synchronous Hindsight write; confirmation appears only after it succeeds.</p>
     </section>
   )
 }
@@ -272,7 +350,7 @@ function RecentInvestigations({ items }) {
 }
 
 function App() {
-  const [form, setForm] = useState({ machineId: 'M-101', fault: 'Overheating', symptoms: 'Temperature rising above normal during long operating cycles', incidentDate: localDate(), technicianObservation: 'Machine overheats after extended operation.' })
+  const [form, setForm] = useState({ machineId: 'M-101', fault: 'Overheating', symptoms: 'Temperature rising above normal during long operating cycles', temperatureC: '', vibrationMmS: '', currentA: '', voltageV: '', incidentDate: localDate(), technicianObservation: 'Machine overheats after extended operation.' })
   const [backendStatus, setBackendStatus] = useState('checking')
   const [hindsightStatus, setHindsightStatus] = useState('idle')
   const [llmStatus, setLlmStatus] = useState('idle')
@@ -284,6 +362,10 @@ function App() {
   const [loadingMessage, setLoadingMessage] = useState('Recalling maintenance experience…')
   const [attempted, setAttempted] = useState(false)
   const [recent, setRecent] = useState(readRecentInvestigations)
+  const [outcomeForm, setOutcomeForm] = useState({ possibleCause: '', confirmedRootCause: '', repairPerformed: '', repairOutcome: '', outcomeNotes: '' })
+  const [savingOutcome, setSavingOutcome] = useState(false)
+  const [outcomeSaved, setOutcomeSaved] = useState(false)
+  const [outcomeError, setOutcomeError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -308,6 +390,11 @@ function App() {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  function onOutcomeChange(event) {
+    const { name, value } = event.target
+    setOutcomeForm((current) => ({ ...current, [name]: value }))
+  }
+
   function saveRecent(status, label) {
     const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, machineId: form.machineId.trim(), fault: form.fault.trim(), at: new Date().toISOString(), status, label }
     setRecent((current) => {
@@ -329,6 +416,9 @@ function App() {
     setMemories([])
     setInvestigation(null)
     setErrorMessage('')
+    setOutcomeForm({ possibleCause: '', confirmedRootCause: '', repairPerformed: '', repairOutcome: '', outcomeNotes: '' })
+    setOutcomeSaved(false)
+    setOutcomeError('')
     setHindsightStatus('loading')
     setLlmStatus('idle')
 
@@ -336,8 +426,13 @@ function App() {
       machineId: form.machineId.trim(),
       fault: form.fault.trim(),
       symptoms: [form.symptoms.trim(), form.incidentDate && `Incident date: ${form.incidentDate}`, form.technicianObservation.trim() && `Technician observation: ${form.technicianObservation.trim()}`].filter(Boolean).join('\n'),
+      incidentDate: form.incidentDate,
+      technicianObservation: form.technicianObservation.trim(),
     }
-    setInvestigatedIncident({ ...incident, displaySymptoms: form.symptoms.trim(), incidentDate: form.incidentDate, technicianObservation: form.technicianObservation.trim() })
+    for (const field of ['temperatureC', 'vibrationMmS', 'currentA', 'voltageV']) {
+      if (form[field] !== '') incident[field] = Number(form[field])
+    }
+    setInvestigatedIncident({ ...incident, displaySymptoms: form.symptoms.trim() })
 
     try {
       const response = await apiPost('/maintenance/investigate', incident)
@@ -361,20 +456,12 @@ function App() {
       if (isGroqError) {
         setLlmStatus('unavailable')
         setErrorMessage(details.error || 'The Groq investigation request failed.')
-        setLoadingMessage('Retrieving Hindsight memory…')
-
-        try {
-          const recall = await apiPost('/memory/recall', {
-            query: `Maintenance history for machine ${incident.machineId}. Current fault: ${incident.fault}. Symptoms: ${incident.symptoms.slice(0, 1200)}`,
-            machineId: incident.machineId,
-          })
-          const recalledFacts = Array.isArray(recall.data?.results) ? recall.data.results : []
-          setMemories(recalledFacts)
+        if (Array.isArray(details.historicalContext)) {
+          setMemories(details.historicalContext)
           setHindsightStatus('connected')
           saveRecent('unavailable', 'Memory retrieved · AI unavailable')
-        } catch (recallError) {
+        } else {
           setHindsightStatus('unavailable')
-          setErrorMessage(`${details.error || 'AI reasoning is unavailable.'} Hindsight could not retrieve memory: ${recallError.message}`)
           saveRecent('error', 'Memory unavailable')
         }
       } else {
@@ -393,6 +480,45 @@ function App() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function onSaveOutcome(event) {
+    event.preventDefault()
+    if (!investigatedIncident) return
+    setSavingOutcome(true)
+    setOutcomeError('')
+    const incident = {
+      machineId: investigatedIncident.machineId,
+      fault: investigatedIncident.fault,
+      incidentDate: investigatedIncident.incidentDate,
+      symptoms: investigatedIncident.displaySymptoms,
+      observedCondition: [
+        investigatedIncident.temperatureC !== undefined && `Temperature: ${investigatedIncident.temperatureC} °C`,
+        investigatedIncident.vibrationMmS !== undefined && `Vibration: ${investigatedIncident.vibrationMmS} mm/s`,
+        investigatedIncident.currentA !== undefined && `Current: ${investigatedIncident.currentA} A`,
+        investigatedIncident.voltageV !== undefined && `Voltage: ${investigatedIncident.voltageV} V`,
+      ].filter(Boolean).join('; '),
+      possibleCause: outcomeForm.possibleCause.trim(),
+      confirmedRootCause: outcomeForm.confirmedRootCause.trim(),
+      repairPerformed: outcomeForm.repairPerformed.trim(),
+      repairOutcome: outcomeForm.repairOutcome.trim(),
+      technicianObservation: [investigatedIncident.technicianObservation, outcomeForm.outcomeNotes.trim()].filter(Boolean).join('\n'),
+      temperatureC: investigatedIncident.temperatureC,
+      vibrationMmS: investigatedIncident.vibrationMmS,
+      currentA: investigatedIncident.currentA,
+      voltageV: investigatedIncident.voltageV,
+    }
+    Object.keys(incident).forEach((key) => incident[key] === undefined && delete incident[key])
+
+    try {
+      await apiPost('/memory/retain', incident)
+      setOutcomeSaved(true)
+      saveRecent('complete', 'Experience learned')
+    } catch (error) {
+      setOutcomeError(error.message || 'Hindsight could not save this experience. It was not marked as learned.')
+    } finally {
+      setSavingOutcome(false)
     }
   }
 
@@ -427,6 +553,9 @@ function App() {
           </div>
 
           <InvestigationResult investigation={investigation} incident={investigatedIncident} llmStatus={llmStatus} hindsightStatus={hindsightStatus} message={errorMessage} />
+
+          {investigation && investigatedIncident && <MemoryComparison incident={investigatedIncident} memories={memories} />}
+          {investigatedIncident && attempted && <InvestigationOutcome incident={investigatedIncident} form={outcomeForm} onChange={onOutcomeChange} onSubmit={onSaveOutcome} saving={savingOutcome} saved={outcomeSaved} error={outcomeError} />}
 
           <MemoryFlow />
           <div className="secondary-grid"><LearningExplanation /><RecentInvestigations items={recent} /></div>

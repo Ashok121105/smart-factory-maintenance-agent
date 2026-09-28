@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: smart-factory-maintenance-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HINDSIGHT_API_KEY
+        sync: false
+      - key: HINDSIGHT_BANK_ID
+        sync: false
+      - key: HINDSIGHT_BASE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false

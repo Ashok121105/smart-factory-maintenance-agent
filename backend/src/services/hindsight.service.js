@@ -1,8 +1,6 @@
-const { createHash } = require("crypto");
 const { HindsightClient } = require("@vectorize-io/hindsight-client");
 const { getHindsightConfig } = require("../config/hindsight.config");
 
-const IDEMPOTENCY_NAMESPACE = Buffer.from("6ba7b8109dad11d180b400c04fd430c8", "hex");
 let hindsightClient;
 
 function getClientAndBankId() {
@@ -22,6 +20,13 @@ function formatIncident(incident) {
     ["Fault", incident.fault],
     ["Incident date", incident.incidentDate],
     ["Symptoms", incident.symptoms],
+    ["Observed condition", incident.observedCondition],
+    ["Temperature (C)", incident.temperatureC],
+    ["Vibration (mm/s)", incident.vibrationMmS],
+    ["Current (A)", incident.currentA],
+    ["Voltage (V)", incident.voltageV],
+    ["Possible cause (unconfirmed)", incident.possibleCause],
+    ["Confirmed root cause (technician recorded)", incident.confirmedRootCause],
     ["Repair performed", incident.repairPerformed],
     ["Part replaced", incident.partReplaced],
     ["Technician action", incident.technicianAction],
@@ -34,31 +39,6 @@ function formatIncident(incident) {
     .filter(([, value]) => value !== undefined)
     .map(([label, value]) => `${label}: ${value}`)
     .join("\n");
-}
-
-function createRetentionOperationId(incident) {
-  const normalizedIncident = Object.fromEntries(
-    Object.entries(incident)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([field, value]) => [
-        field,
-        typeof value === "string"
-          ? value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase()
-          : value,
-      ])
-  );
-  const digest = createHash("sha1")
-    .update(IDEMPOTENCY_NAMESPACE)
-    .update("smart-factory-maintenance-retain:")
-    .update(JSON.stringify(normalizedIncident))
-    .digest()
-    .subarray(0, 16);
-
-  digest[6] = (digest[6] & 0x0f) | 0x50;
-  digest[8] = (digest[8] & 0x3f) | 0x80;
-  const hex = digest.toString("hex");
-
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function toHindsightRequestError() {
@@ -86,8 +66,7 @@ async function retainMaintenanceIncident(incident) {
   try {
     return await client.retain(bankId, formatIncident(incident), {
       ...options,
-      async: true,
-      operationId: createRetentionOperationId(incident),
+      async: false,
     });
   } catch {
     throw toHindsightRequestError();

@@ -1,4 +1,4 @@
-const { recallMaintenanceMemory, retainMaintenanceIncident } = require("./hindsight.service");
+const { recallMaintenanceMemory } = require("./hindsight.service");
 const { GROQ_MODEL, generateMaintenanceInvestigation } = require("./groq.service");
 
 async function investigateMaintenanceIncident(currentIncident) {
@@ -6,8 +6,12 @@ async function investigateMaintenanceIncident(currentIncident) {
     `Maintenance history for machine ${currentIncident.machineId}.`,
     `Current fault: ${currentIncident.fault}.`,
     `Current symptoms: ${currentIncident.symptoms}.`,
+    currentIncident.technicianObservation && `Technician observation: ${currentIncident.technicianObservation}.`,
+    ...["temperatureC", "vibrationMmS", "currentA", "voltageV"]
+      .filter((field) => currentIncident[field] !== undefined)
+      .map((field) => `${field}: ${currentIncident[field]}.`),
     "Recall related previous incidents, symptoms, repairs, replaced parts, outcomes, recurrence, and technician observations.",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 
   // Reuse the existing Hindsight client/service; these memories are returned directly from recall.
   const recallResponse = await recallMaintenanceMemory(recallQuery, currentIncident.machineId);
@@ -21,8 +25,13 @@ async function investigateMaintenanceIncident(currentIncident) {
     metadata: memory.metadata,
     tags: memory.tags,
   }));
-  const investigation = await generateMaintenanceInvestigation(currentIncident, historicalContext);
-  await retainMaintenanceIncident(currentIncident);
+  let investigation;
+  try {
+    investigation = await generateMaintenanceInvestigation(currentIncident, historicalContext);
+  } catch (error) {
+    error.historicalContext = historicalContext;
+    throw error;
+  }
 
   return {
     machineId: currentIncident.machineId,
@@ -34,6 +43,10 @@ async function investigateMaintenanceIncident(currentIncident) {
       source: "hindsight",
     },
     investigation,
+    memoryRecall: {
+      source: "hindsight",
+      resultCount: historicalContext.length,
+    },
     llm: {
       status: "configured",
       provider: "groq",

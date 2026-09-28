@@ -28,6 +28,7 @@ function errorMiddleware(error, req, res, next) {
     return res.status(503).json({
       success: false,
       error: "Groq is not configured",
+      historicalContext: error.historicalContext || [],
     });
   }
 
@@ -35,6 +36,7 @@ function errorMiddleware(error, req, res, next) {
     const response = {
       success: false,
       error: error.providerMessage || "Groq investigation request failed",
+      historicalContext: error.historicalContext || [],
     };
     if (Number.isInteger(error.providerStatus)) {
       response.providerStatus = error.providerStatus;
@@ -46,6 +48,7 @@ function errorMiddleware(error, req, res, next) {
     return res.status(502).json({
       success: false,
       error: "Groq returned an invalid investigation response",
+      historicalContext: error.historicalContext || [],
     });
   }
 
